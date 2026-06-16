@@ -16,13 +16,14 @@ class IngestionPipeline:
         self.extractor = Extractor()
         self.manual = ManualBuilder()
 
-    def run(self, source_dir: Path | str | None = None) -> dict:
+    def run(self, source_dir: Path | str | None = None, use_llm: bool = False) -> dict:
         source_dir = Path(source_dir or settings.source_dir)
         operations = self.extractor.extract(source_dir)
-        # TODO(P2/P3): 매뉴얼 생성 → 검수·동결 → 임베딩 → Qdrant + 그래프.
+        manuals = [self.manual.build(op, use_llm=use_llm) for op in operations]
+        # TODO(P3): 검수·동결된 매뉴얼 → 임베딩 → Qdrant + 그래프.
         return {
             "source_dir": str(source_dir),
             "operations_found": len(operations),
-            "manuals_built": 0,
-            "status": "skeleton",
+            "manuals_built": len(manuals),
+            "status": "ok" if manuals else "skeleton",
         }
