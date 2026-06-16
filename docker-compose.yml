@@ -1,0 +1,10 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: bnk-ops-qdrant
+    ports:
+      - "6335:6333"
+      - "6336:6334"
+    volumes:
+      - ./data/qdrant_storage:/qdrant/storage
+    restart: always

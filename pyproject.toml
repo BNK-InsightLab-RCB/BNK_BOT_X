@@ -1,0 +1,12 @@
+[project]
+name = "bnk-bot-x"
+version = "0.0.1"
+description = "Source-aware ops support engine — code/SQL/schema to reviewed manuals"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

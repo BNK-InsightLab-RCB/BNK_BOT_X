@@ -1,0 +1,14 @@
+# Engine API (FastAPI; SpringBoot가 이 엔진을 호출)
+fastapi
+uvicorn[standard]
+pydantic-settings
+loguru
+
+# Vector DB
+qdrant-client
+
+# Embedding: KURE-v1 (한국어 검색, BGE-M3 기반, 1024-dim) — lazy-load, P3부터 실제 사용
+sentence-transformers
+
+# LLM 답변 생성: Qwen via Ollama OpenAI 호환 — lazy-load, P2/P4부터 실제 사용
+openai
