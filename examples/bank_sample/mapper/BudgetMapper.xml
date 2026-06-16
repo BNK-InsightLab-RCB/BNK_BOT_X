@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bnk.budget.BudgetMapper">
+
+    <!-- 예산집행내역 등록 (초기 상태 R:등록) -->
+    <insert id="insertBudget">
+        INSERT INTO TB_BUDGET_EXEC (BUDGET_NO, DEPT_CD, AMOUNT, LIMIT_AMT, STATUS)
+        VALUES (#{budgetNo}, #{deptCd}, #{amount}, #{limitAmt}, 'R')
+    </insert>
+</mapper>

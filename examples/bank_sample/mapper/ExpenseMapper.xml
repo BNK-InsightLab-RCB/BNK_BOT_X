@@ -3,12 +3,16 @@
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.bnk.expense.ExpenseMapper">
 
-    <!-- 경비집행내역 단건 조회 (사용중인 건만) -->
+    <!-- 경비집행내역 단건 조회 (동적 SQL: 사용여부 선택 조건) -->
     <select id="selectExpense" resultType="ExpenseExec">
         SELECT EXEC_NO, DEPT_CD, AMOUNT, STATUS, USE_YN
         FROM TB_EXPENSE_EXEC
-        WHERE EXEC_NO = #{execNo}
-          AND USE_YN = 'Y'
+        <where>
+            EXEC_NO = #{execNo}
+            <if test="useYn != null">
+                AND USE_YN = #{useYn}
+            </if>
+        </where>
     </select>
 
     <!-- 경비집행내역 등록 (초기 상태 R:등록) -->
@@ -16,4 +20,11 @@
         INSERT INTO TB_EXPENSE_EXEC (EXEC_NO, DEPT_CD, AMOUNT, STATUS, REG_USER)
         VALUES (#{execNo}, #{deptCd}, #{amount}, 'R', #{regUser})
     </insert>
+
+    <!-- 경비집행내역 상태 변경 (승인 처리) -->
+    <update id="updateStatus">
+        UPDATE TB_EXPENSE_EXEC
+        SET STATUS = 'A'
+        WHERE EXEC_NO = #{execNo}
+    </update>
 </mapper>

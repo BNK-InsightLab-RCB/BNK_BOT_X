@@ -28,4 +28,18 @@ public class ExpenseService {
         expenseMapper.insertExpense(dto);
         return ApiResponse.ok();
     }
+
+    public ApiResponse approveExpense(ExpenseDto dto) {
+        // 승인 권한이 없으면 처리할 수 없다
+        if (!SecurityUtil.hasAuthority("EXPENSE_APPROVE")) {
+            throw new BizException("E_AUTH", "경비 승인 권한이 없습니다.");
+        }
+        // 등록(STATUS=R) 상태인 경비만 승인할 수 있다
+        ExpenseExec cur = expenseMapper.selectExpense(dto.getExecNo());
+        if (cur == null || !"R".equals(cur.getStatus())) {
+            throw new BizException("E_STATUS", "등록 상태인 경비만 승인할 수 있습니다.");
+        }
+        expenseMapper.updateStatus(dto.getExecNo());
+        return ApiResponse.ok();
+    }
 }

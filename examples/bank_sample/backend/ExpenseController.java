@@ -17,4 +17,10 @@ public class ExpenseController {
     public ApiResponse save(@RequestBody ExpenseDto dto) {
         return expenseService.saveExpense(dto);
     }
+
+    // 경비집행내역 승인
+    @PostMapping("/approve")
+    public ApiResponse approve(@RequestBody ExpenseDto dto) {
+        return expenseService.approveExpense(dto);
+    }
 }
