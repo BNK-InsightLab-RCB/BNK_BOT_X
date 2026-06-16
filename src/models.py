@@ -75,6 +75,12 @@ class Manual:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "Manual":
+        known = {k: d[k] for k in cls.__dataclass_fields__ if k in d}
+        known["provenance"] = [Provenance(**p) for p in d.get("provenance", [])]
+        return cls(**known)
+
     def body_for(self, role: str) -> str:
         return self.branch_md if role == "branch" else self.it_md
 

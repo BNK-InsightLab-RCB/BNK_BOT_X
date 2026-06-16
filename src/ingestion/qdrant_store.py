@@ -75,7 +75,18 @@ class QdrantStore:
         return unicodedata.normalize("NFC", value) if isinstance(value, str) else value
 
     def upsert(self, points: list) -> int:
-        raise NotImplementedError("Qdrant upsert: P3")
+        self.client.upsert(self.collection, points=points)
+        return len(points)
 
-    def search(self, *args, **kwargs):
-        raise NotImplementedError("hybrid search: P4")
+    def search(self, vector: list[float], top_k: int = 5, role: str | None = None):
+        """dense 검색(P3). 하이브리드(dense+sparse)는 P4에서 확장."""
+        from qdrant_client.models import FieldCondition, Filter, MatchValue
+
+        flt = None
+        if role:
+            flt = Filter(must=[FieldCondition(key="role", match=MatchValue(value=self.nfc(role)))])
+        res = self.client.query_points(
+            self.collection, query=vector, using="dense", limit=top_k,
+            query_filter=flt, with_payload=True,
+        )
+        return res.points
