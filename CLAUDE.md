@@ -3,10 +3,10 @@
 은행 업무 담당자가 **사내 프로그램을 쓰다 막힐 때**(오류·업무흐름·화면 표기 의미·다음 단계·화면 간 데이터 차이) 지금은 개발자에게 전화로 묻는 질문을, **챗봇이 1차로 받아 답하고 못 푸는 것만 개발자에게 넘기는** 엔진.
 근거는 새로 저작하지 않고 **이미 있는 자산(소스코드·SQL·스키마·표준용어)을 변환**해서 만든다.
 
-> **Status: P4 완료** — P0~P3 ✅ · P4 검색+정밀도 게이트 ✅(측정③). KURE 설치됨. 다음 = **P5 측정 게이트(슬라이스 종료 판정)**.
-> 코드: `src/`(엔진 전체) · `examples/bank_sample/`(seed: 경비 save/approve · 예산 save · 동적 SQL) · `scripts/`(eval_extract·build_manuals·load_manuals·eval_query) · `tests/`(8) · `data/manuals/` · `.venv/`.
+> **Status: 슬라이스(P0~P5) 통과 ✅** — 측정① pytest 8/8 · 측정③ eval_answer 5/5(exit 0). KURE 설치됨. 다음 = **P6 예시 앱 확대(규모·난이도)**.
+> 코드: `src/`(엔진 전체) · `examples/bank_sample/`(seed 3화면) · `scripts/`(eval_extract·build_manuals·load_manuals·eval_query·eval_answer) · `tests/`(8) · `data/manuals/` · `.venv/`.
 > 실행: `docker compose up -d`(Qdrant 6335) → `uvicorn src.main:app --port 9000`.
-> 빌드·적재·질의: `build_manuals.py` → `load_manuals.py` → `eval_query.py`. 측정: `eval_extract.py` · `pytest`.
+> 게이트: `pytest` + `python scripts/eval_answer.py`. 빌드·적재: `build_manuals.py` → `load_manuals.py`.
 > 형제 프로젝트: `../BNK_Bot`(원본, 약관/설명서 PDF RAG — 참고 대상) · `../BNK_Bot_S`(소스-aware 프로토타입 — 참고 대상).
 
 ---
@@ -332,9 +332,10 @@ LLM은 무에서 짓는 게 아니라 추출된 사실을 요약하는 역할이
   - **게이트(측정③) ✅ PASS (`scripts/eval_query.py`, 4/4):** 경비 저장→expense · **예산 등록→budget(근거리 중복 변별)** · 경비 승인→expense_approve(액션 변별) · 비밀번호→**핸드오프(회피)**. 임계는 측정으로 튜닝(관련 0.71~0.75 vs 도메인밖 0.42).
   - ⚠️ "하이브리드"의 sparse는 현재 char-bigram lexical로 근사. Qdrant 네이티브 sparse 벡터는 규모(P6)에서 필요 시 교체.
 
-- **P5 · 측정 게이트 (슬라이스 종료 판정)**
-  - `eval_retrieval`(식별자 recall 포함) + `eval_answer`(정확도·회피 양방향·숫자 충실도).
-  - 측정①②③ 통과해야 다음으로. **여기서 A의 사업성이 판가름.**
+- **P5 · 측정 게이트 (슬라이스 종료 판정)** ✅ **완료 — 슬라이스 통과**
+  - `scripts/eval_answer.py` — 기대값 자동 채점(변별 + 양방향 회피 + branch 누출). **5/5 PASS, exit 0.**
+  - 측정① pytest(추출) 4/4 · 측정②(매뉴얼) 4/4 · 측정③(eval_answer) 5/5 → **슬라이스 P0~P5 전부 통과.**
+  - 결론: 예시 앱 위에서 소스→추출→매뉴얼→적재→질의(변별·회피)가 end-to-end로 동작함을 증명. → P6 진입 가능.
 
 ### 확대 단계 (P6~) — 슬라이스 통과 후에만
 
