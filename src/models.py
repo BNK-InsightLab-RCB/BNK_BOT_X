@@ -25,10 +25,11 @@ class Provenance:
 class FailureMode:
     """오퍼레이션이 실패할 수 있는 한 가지 방식(매뉴얼 안의 한 항목)."""
 
-    cause: str  # 짧은 라벨: "권한 없음"
+    cause: str  # 오류 메시지/짧은 라벨: "경비 저장 권한이 없습니다."
+    error_code: str = ""  # 코드값: "E_AUTH"
     condition: str = ""  # 코드 근거 조건(verbatim): "!hasAuthority('EXPENSE_SAVE')"
-    meaning: str = ""  # 업무 의미(주석/표기의미): "저장 권한이 없으면 처리 불가"
-    action: str = ""  # 담당자 조치: "권한 담당자에게 EXPENSE_SAVE 신청"
+    meaning: str = ""  # 업무 의미(한글 주석): "저장 권한이 없으면 처리 불가"
+    action: str = ""  # 담당자 조치(P2에서 생성): "권한 담당자에게 EXPENSE_SAVE 신청"
     evidence: list[Provenance] = field(default_factory=list)
 
 
@@ -45,6 +46,7 @@ class ExtractedOperation:
     table_ko: list[str] = field(default_factory=list)
     failure_modes: list[FailureMode] = field(default_factory=list)
     comments: list[str] = field(default_factory=list)  # 코드 위치에 묶인 한글 주석
+    notation: dict[str, Any] = field(default_factory=dict)  # 표기의미: {table: {columns, code_values}}
     provenance: list[Provenance] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
