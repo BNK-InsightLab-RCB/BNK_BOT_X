@@ -114,9 +114,12 @@ def parse_frontend(path: Path, index: dict[str, Any] | None = None) -> dict:
         screen_ko = index.get("menu_labels", {}).get(route_path, screen_ko)
     aliases = {_service_module_name(import_path): alias for alias, import_path in _IMPORT_ALIAS_RE.findall(text)}
     alias_to_module = {alias: module for module, alias in aliases.items()}
+    services = index.get("services", {})
     for alias, fn in re.findall(r"\b(\w+)\.(\w+)\s*\(", text):
-        module = alias_to_module.get(alias)
-        call = index.get("services", {}).get(module, {}).get(fn) if module else None
+        # import * as alias 면 그 모듈, 아니면 호출 객체명이 서비스 모듈명과 같으면 직접 매칭.
+        # (실코드엔 import 누락/스타일 편차가 있어 객체명 직접 매칭이 더 robust)
+        module = alias_to_module.get(alias) or (alias if alias in services else None)
+        call = services.get(module, {}).get(fn) if module else None
         if not call:
             continue
         key = (call["http_method"], call["api_path"])
