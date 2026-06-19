@@ -3,9 +3,9 @@
 은행 업무 담당자가 **사내 프로그램을 쓰다 막힐 때**(오류·업무흐름·화면 표기 의미·다음 단계·화면 간 데이터 차이) 지금은 개발자에게 전화로 묻는 질문을, **챗봇이 1차로 받아 답하고 못 푸는 것만 개발자에게 넘기는** 엔진.
 근거는 새로 저작하지 않고 **이미 있는 자산(소스코드·SQL·스키마·표준용어)을 변환**해서 만든다.
 
-> **Status: 슬라이스(P0~P5) 통과 ✅ + 엔진 보강 중** — pytest 12/12 · eval_answer 5/5. **lineage 그래프 roll-up ✅ · 핸드오프 축적 루프 ✅**. KURE 설치됨.
-> 다음 = (샘플 무관) 검수·동결 워크플로우 · (선택)UI/sparse / (샘플 대기) **P6 파서 일반화**.
-> 코드: `src/`(엔진 전체 + 그래프 + 핸드오프) · `examples/bank_sample/`(seed 3화면) · `scripts/`(eval_extract·build_manuals·load_manuals·eval_query·eval_answer) · `tests/`(12) · `data/` · `.venv/`.
+> **Status: 슬라이스(P0~P5) 통과 ✅ + 엔진 보강 완료** — pytest 15/15 · eval_answer 5/5. **그래프 roll-up ✅ · 핸드오프 축적 ✅ · 검수·동결 워크플로우 ✅**. KURE 설치됨.
+> 샘플-무관 핵심 보강 완료. 다음 = (선택) 최소 UI / 진짜 sparse · (샘플 대기) **P6 파서 일반화** · (배포) 인증.
+> 코드: `src/`(엔진 전체 + 그래프 + 핸드오프 + 검수) · `examples/bank_sample/`(seed 3화면) · `scripts/`(eval_extract·build_manuals·review_manuals·load_manuals·eval_query·eval_answer) · `tests/`(15) · `data/` · `.venv/`.
 > 실행: `docker compose up -d`(Qdrant 6335) → `uvicorn src.main:app --port 9000`.
 > 게이트: `pytest` + `python scripts/eval_answer.py`. 빌드·적재: `build_manuals.py` → `load_manuals.py`.
 > 형제 프로젝트: `../BNK_Bot`(원본, 약관/설명서 PDF RAG — 참고 대상) · `../BNK_Bot_S`(소스-aware 프로토타입 — 참고 대상).
@@ -177,7 +177,7 @@ LLM은 무에서 짓는 게 아니라 추출된 사실을 요약하는 역할이
 - **`branch_md` / `it_md`** — 역할별 Markdown 산문. 임베딩·답변의 원천. 숫자·조건은 verbatim 보존.
 - **구조 필드** — Qdrant payload(`screen_id`/`table_en`/`table_ko`/`action`/`role`) + lineage 그래프 링크(`lineage_ref`) + 근거(`provenance`).
 - **Qdrant 적재:** role별 포인트 분리(role=branch는 `branch_md` 임베딩, role=it는 `it_md`) → 질의 시 역할 안에서 검색.
-- **검수 산물(선택):** 동결 매뉴얼을 git용 `.md`(+YAML frontmatter)로도 직렬화 → 감사 추적. 빌드가 위 JSON으로 변환.
+- **검수·동결(구현됨):** build→**draft** → `scripts/review_manuals.py` 승인 → **frozen** + 검수자·시각 + `data/review_log.jsonl`(감사). **load는 frozen만 적재**(draft는 사용자에게 안 닿음). 검토용 `.branch.md`/`.it.md` 동봉.
 
 ---
 

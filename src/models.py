@@ -69,8 +69,10 @@ class Manual:
     facts: dict[str, Any] = field(default_factory=dict)
     lineage_ref: list[str] = field(default_factory=list)
     provenance: list[Provenance] = field(default_factory=list)
-    status: str = "draft"  # draft | approved | frozen
+    status: str = "draft"  # draft | frozen
     version: int = 1
+    reviewed_at: str = ""  # 검수·동결 시각(감사)
+    reviewed_by: str = ""  # 검수자(감사)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
