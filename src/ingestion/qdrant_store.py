@@ -17,6 +17,10 @@ _NAMESPACE = uuid.uuid5(uuid.NAMESPACE_DNS, "bnk_bot_x")
 INDEXED_FIELDS = ("role", "screen_id", "action", "table_en")
 
 
+def _has_named(config: Any, name: str) -> bool:
+    return isinstance(config, dict) and name in config
+
+
 class QdrantStore:
     def __init__(self, url: str, collection: str, dim: int = 1024, api_key: str | None = None):
         from qdrant_client import QdrantClient
@@ -50,6 +54,8 @@ class QdrantStore:
                 vectors_config={"dense": VectorParams(size=self.dim, distance=Distance.COSINE)},
                 sparse_vectors_config={"sparse": SparseVectorParams()},
             )
+        else:
+            self._validate_collection_schema()
         for field_name in INDEXED_FIELDS:  # idempotent
             try:
                 self.client.create_payload_index(
@@ -59,6 +65,19 @@ class QdrantStore:
                 )
             except Exception:
                 pass
+
+    def _validate_collection_schema(self) -> None:
+        info = self.client.get_collection(self.collection)
+        params = info.config.params
+        vectors = getattr(params, "vectors", None)
+        sparse_vectors = getattr(params, "sparse_vectors", None)
+        dense = vectors.get("dense") if _has_named(vectors, "dense") else None
+        dense_size = getattr(dense, "size", None)
+        if dense_size != self.dim or not _has_named(sparse_vectors, "sparse"):
+            raise RuntimeError(
+                f"Qdrant collection '{self.collection}' schema mismatch. "
+                "Run scripts/load_manuals.py --recreate to rebuild dense+sparse vectors."
+            )
 
     def count(self) -> int:
         try:
@@ -78,15 +97,22 @@ class QdrantStore:
         self.client.upsert(self.collection, points=points)
         return len(points)
 
-    def search(self, vector: list[float], top_k: int = 5, role: str | None = None):
-        """dense 검색(P3). 하이브리드(dense+sparse)는 P4에서 확장."""
-        from qdrant_client.models import FieldCondition, Filter, MatchValue
+    def search(
+        self,
+        query: list[float] | dict,
+        top_k: int = 5,
+        role: str | None = None,
+        using: str = "dense",
+    ):
+        """dense 또는 sparse named vector 검색."""
+        from qdrant_client.models import FieldCondition, Filter, MatchValue, SparseVector
 
         flt = None
         if role:
             flt = Filter(must=[FieldCondition(key="role", match=MatchValue(value=self.nfc(role)))])
+        q = SparseVector(**query) if using == "sparse" and isinstance(query, dict) else query
         res = self.client.query_points(
-            self.collection, query=vector, using="dense", limit=top_k,
+            self.collection, query=q, using=using, limit=top_k,
             query_filter=flt, with_payload=True,
         )
         return res.points

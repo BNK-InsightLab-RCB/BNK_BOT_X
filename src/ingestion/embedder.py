@@ -7,9 +7,35 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
+from typing import Any
 
 
 class Embedder:
+    @staticmethod
+    def bigrams(text: str) -> set[str]:
+        """식별자/한글 질의를 같은 방식으로 접기 위한 char-bigram 토큰."""
+        normalized = re.sub(r"[^0-9a-z가-힣]", "", (text or "").lower())
+        return {normalized[i : i + 2] for i in range(len(normalized) - 1)}
+
+    @staticmethod
+    def get_sparse_vector(text: str) -> dict[str, Any] | None:
+        """Qdrant sparse vector.
+
+        값은 binary/count lexical matching에 가깝게 둔다. dense가 의미 검색을 맡고,
+        sparse는 `TB_...`, `/api/...`, mapper id, error code 같은 식별자 recall을 보강한다.
+        """
+        tokens = Embedder.bigrams(text)
+        if not tokens:
+            return None
+        weights: dict[int, float] = {}
+        for token in tokens:
+            idx = int(hashlib.md5(token.encode("utf-8")).hexdigest(), 16) % 1_000_003
+            weights[idx] = weights.get(idx, 0.0) + 1.0
+        indices = sorted(weights)
+        values = [weights[idx] for idx in indices]
+        return {"indices": indices, "values": values}
+
     def __init__(self, model_name: str, dim: int = 1024):
         self.model_name = model_name
         self.dim = dim

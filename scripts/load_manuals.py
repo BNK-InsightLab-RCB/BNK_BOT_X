@@ -2,6 +2,7 @@
 
   docker compose up -d  먼저(Qdrant 6335).
   PYTHONPATH=. python scripts/load_manuals.py
+  PYTHONPATH=. python scripts/load_manuals.py --recreate  # 컬렉션 schema 재생성
 """
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from src.models import Manual
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--include-draft", action="store_true", help="draft도 적재(개발용)")
+    ap.add_argument("--recreate", action="store_true", help="Qdrant 컬렉션 재생성")
     args = ap.parse_args()
 
     files = sorted(settings.manuals_dir.glob("*.json"))
@@ -40,7 +42,11 @@ def main() -> None:
     if not store.ping():
         print("Qdrant 미가동 — docker compose up -d 먼저")
         return
-    store.ensure_collection()
+    try:
+        store.ensure_collection(recreate=args.recreate)
+    except RuntimeError as exc:
+        print(str(exc))
+        return
 
     embedder = Embedder(settings.embedding_model, dim=settings.embedding_dim)
     n = Indexer(store, embedder).index_manuals(manuals)
