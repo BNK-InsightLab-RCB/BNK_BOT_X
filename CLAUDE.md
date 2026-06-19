@@ -3,9 +3,9 @@
 은행 업무 담당자가 **사내 프로그램을 쓰다 막힐 때**(오류·업무흐름·화면 표기 의미·다음 단계·화면 간 데이터 차이) 지금은 개발자에게 전화로 묻는 질문을, **챗봇이 1차로 받아 답하고 못 푸는 것만 개발자에게 넘기는** 엔진.
 근거는 새로 저작하지 않고 **이미 있는 자산(소스코드·SQL·스키마·표준용어)을 변환**해서 만든다.
 
-> **Status: 슬라이스(P0~P5) 통과 ✅ + 엔진 보강 중** — pytest 11/11 · eval_answer 5/5. **lineage 그래프 연결·관련작업 roll-up ✅**. KURE 설치됨.
-> 다음 = (샘플 무관) 핸드오프 축적 루프 · 검수 워크플로우 / (샘플 대기) **P6 파서 일반화**.
-> 코드: `src/`(엔진 전체 + 그래프) · `examples/bank_sample/`(seed 3화면) · `scripts/`(eval_extract·build_manuals·load_manuals·eval_query·eval_answer) · `tests/`(11) · `data/` · `.venv/`.
+> **Status: 슬라이스(P0~P5) 통과 ✅ + 엔진 보강 중** — pytest 12/12 · eval_answer 5/5. **lineage 그래프 roll-up ✅ · 핸드오프 축적 루프 ✅**. KURE 설치됨.
+> 다음 = (샘플 무관) 검수·동결 워크플로우 · (선택)UI/sparse / (샘플 대기) **P6 파서 일반화**.
+> 코드: `src/`(엔진 전체 + 그래프 + 핸드오프) · `examples/bank_sample/`(seed 3화면) · `scripts/`(eval_extract·build_manuals·load_manuals·eval_query·eval_answer) · `tests/`(12) · `data/` · `.venv/`.
 > 실행: `docker compose up -d`(Qdrant 6335) → `uvicorn src.main:app --port 9000`.
 > 게이트: `pytest` + `python scripts/eval_answer.py`. 빌드·적재: `build_manuals.py` → `load_manuals.py`.
 > 형제 프로젝트: `../BNK_Bot`(원본, 약관/설명서 PDF RAG — 참고 대상) · `../BNK_Bot_S`(소스-aware 프로토타입 — 참고 대상).
@@ -341,7 +341,7 @@ LLM은 무에서 짓는 게 아니라 추출된 사실을 요약하는 역할이
 ### 확대 단계 (P6~) — 슬라이스 통과 후에만
 
 - **P6 · 예시 앱 확대 + 일반화** — 예시 웹 앱을 **현실적 규모·난이도**(많은 테이블·화면, 동적 SQL, 프레임워크 패턴)로 키워 *규모에서도* 동작 시연 + Extractor 일반화. ← "1000 테이블"급 시연은 여기.
-- **P7 · 핸드오프 축적 루프** — 넘긴 Q&A 적재 → 다음 빌드 매뉴얼 보강 피드백.
+- **P7 · 핸드오프 축적 루프** ✅ **완료** — `handoff_store.py`(회피 질문 로깅·축적, top 후보·점수로 *근거리 미스 vs 도메인 밖* 구분) + `service`(회피 시 log) + `/admin/handoffs`(조회) · `/admin/handoffs/{id}/resolve`(해소). `tests/test_handoff.py`. → 못 푼 질문이 데이터로 쌓여 빈틈을 보여줌.
 
 ### 엔진 밖 (보류, 기록만)
 

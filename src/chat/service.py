@@ -26,15 +26,23 @@ _SYS_IT = (
 
 
 class ChatService:
-    def __init__(self, retriever, gate, generator, graph=None):
+    def __init__(self, retriever, gate, generator, graph=None, handoffs=None):
         self.retriever = retriever
         self.gate = gate
         self.generator = generator
         self.graph = graph  # lineage 그래프(질의시점 관련작업 확장)
+        self.handoffs = handoffs  # 핸드오프 축적
 
     def answer(self, question: str, role: str = "branch", top_k: int = 5) -> QueryResponse:
         hits = self.retriever.retrieve(question, role=role, top_k=top_k)
         if not self.gate.passes(hits):
+            if self.handoffs is not None:  # 못 푼 질문 축적(빈틈 데이터)
+                top = hits[0] if hits else None
+                self.handoffs.log(
+                    question, role,
+                    top_manual_id=(top["payload"]["manual_id"] if top else None),
+                    top_score=(round(float(top["score"]), 3) if top else None),
+                )
             return QueryResponse(answer=HANDOFF_MSG, handoff=True, sources=[])
         top = hits[0]["payload"]
         answer = self._compose(question, top.get("body", ""), role)

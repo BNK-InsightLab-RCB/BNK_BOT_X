@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     data_dir: Path = base_dir / "data"
     manuals_dir: Path = data_dir / "manuals"
     graph_db_path: Path = data_dir / "lineage.sqlite3"
+    handoff_db_path: Path = data_dir / "handoffs.sqlite3"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

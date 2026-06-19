@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 
 from src.chat.gate import PrecisionGate
 from src.chat.generator import Generator
+from src.chat.handoff_store import HandoffStore
 from src.chat.retriever import Retriever
 from src.chat.router import router as chat_router
 from src.chat.service import ChatService
@@ -47,12 +48,14 @@ async def lifespan(app: FastAPI):
     retriever = Retriever(embedder, store)
     gate = PrecisionGate()
     graph = GraphStore(settings.graph_db_path)
+    handoffs = HandoffStore(settings.handoff_db_path)
 
     app.state.embedder = embedder
     app.state.store = store
     app.state.generator = generator
     app.state.graph = graph
-    app.state.chat_service = ChatService(retriever, gate, generator, graph)
+    app.state.handoffs = handoffs
+    app.state.chat_service = ChatService(retriever, gate, generator, graph, handoffs)
     yield
 
 
