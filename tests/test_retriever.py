@@ -1,6 +1,6 @@
 """검색 랭킹 보조 신호 — 일반 업무 액션 의도만 반영한다."""
 
-from src.chat.retriever import _action_bonus, _action_match
+from src.chat.retriever import _action_bonus, _action_match, _collection_match
 
 
 def test_action_bonus_matches_generic_business_action_intent():
@@ -34,3 +34,31 @@ def test_action_match_marks_explicit_intent_mismatch():
     }
 
     assert _action_match("예금 상품 목록이 안보여요", payload) == (True, False)
+
+
+def test_collection_match_rejects_history_query_against_customer_lookup():
+    payload = {
+        "action": "getCustomer",
+        "api_path": "/api/customer/{custNo}",
+        "screen_ko": "대출실행",
+        "screen_id": "LOAN_EXECUTE",
+    }
+
+    assert _collection_match("고객 대출 실행 이력 조회하는데 조회가 안돼", payload) == (
+        True,
+        False,
+    )
+
+
+def test_collection_match_accepts_history_target():
+    payload = {
+        "action": "getHistory",
+        "api_path": "/api/loan/history",
+        "screen_ko": "대출실행",
+        "screen_id": "LOAN_EXECUTE",
+    }
+
+    assert _collection_match("고객 대출 실행 이력 조회하는데 조회가 안돼", payload) == (
+        True,
+        True,
+    )

@@ -25,6 +25,8 @@ class PrecisionGate:
         """
         if not hits:
             return False
+        if hits[0].get("collection_intent") and not hits[0].get("collection_match"):
+            return False
         if hits[0].get("action_intent") and not hits[0].get("action_match"):
             return False
         d, lx = hits[0]["dense"], hits[0]["lexical"]

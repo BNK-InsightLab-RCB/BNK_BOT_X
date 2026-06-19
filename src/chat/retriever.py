@@ -19,6 +19,20 @@ _ACTION_TERMS = {
     "calculate": ("calculate", "calc", "계산", "산출"),
     "get": ("get", "list", "search", "find", "조회", "검색", "상세", "목록"),
 }
+_COLLECTION_QUERY_TERMS = ("이력", "목록", "리스트", "내역 조회", "조회 내역", "history", "list")
+_COLLECTION_TARGET_TERMS = (
+    "history",
+    "list",
+    "search",
+    "accounts",
+    "vouchers",
+    "transfers",
+    "subscriptions",
+    "receipts",
+    "transactions",
+    "이력",
+    "목록",
+)
 
 
 def _action_families(text: str) -> set[str]:
@@ -39,6 +53,17 @@ def _action_match(question: str, payload: dict) -> tuple[bool, bool]:
 def _action_bonus(question: str, payload: dict) -> float:
     _, matched = _action_match(question, payload)
     return 0.20 if matched else 0.0
+
+
+def _collection_match(question: str, payload: dict) -> tuple[bool, bool]:
+    q = (question or "").lower()
+    has_intent = any(term.lower() in q for term in _COLLECTION_QUERY_TERMS)
+    if not has_intent:
+        return False, False
+    target = " ".join(
+        str(payload.get(k) or "").lower() for k in ("action", "api_path", "screen_ko", "screen_id")
+    )
+    return True, any(term.lower() in target for term in _COLLECTION_TARGET_TERMS)
 
 
 class Retriever:
@@ -81,6 +106,7 @@ class Retriever:
             lexical = min(item["sparse_score"] / q_len, 1.0)
             dense = item["dense"]
             action_intent, action_match = _action_match(question, item["payload"])
+            collection_intent, collection_match = _collection_match(question, item["payload"])
             action_bonus = _action_bonus(question, item["payload"])
             hits.append(
                 {
@@ -89,6 +115,8 @@ class Retriever:
                     "lexical": lexical,
                     "action_intent": action_intent,
                     "action_match": action_match,
+                    "collection_intent": collection_intent,
+                    "collection_match": collection_match,
                     "score": dense + lexical + action_bonus,
                 }
             )

@@ -33,3 +33,18 @@ def test_gate_rejects_top_hit_when_explicit_action_intent_mismatches():
     }
 
     assert not gate.passes([hit])
+
+
+def test_gate_rejects_collection_query_when_top_hit_is_not_collection_lookup():
+    gate = PrecisionGate()
+
+    hit = {
+        "dense": 0.75,
+        "lexical": 0.37,
+        "collection_intent": True,
+        "collection_match": False,
+        "action_intent": True,
+        "action_match": True,
+    }
+
+    assert not gate.passes([hit])
