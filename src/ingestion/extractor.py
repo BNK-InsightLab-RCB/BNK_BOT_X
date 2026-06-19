@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.ingestion.parsers.ddl import parse_ddl
-from src.ingestion.parsers.frontend import parse_frontend
+from src.ingestion.parsers.frontend import build_frontend_index, parse_frontend
 from src.ingestion.parsers.java import parse_java
 from src.ingestion.parsers.mybatis import parse_mybatis
 from src.models import ExtractedOperation, FailureMode, Provenance
@@ -33,6 +33,7 @@ class Extractor:
         controllers: dict[str, dict] = {}
         services: dict[str, dict] = {}
         frontends: list[dict] = []
+        frontend_index = build_frontend_index(source_dir)
 
         for p in sorted(source_dir.rglob("*")):
             if not p.is_file():
@@ -46,7 +47,7 @@ class Extractor:
             elif suffix == ".java":
                 self._index_java(parse_java(p), controllers, services)
             elif suffix in _FRONTEND_EXT:
-                fe = parse_frontend(p)
+                fe = parse_frontend(p, frontend_index)
                 if fe["screen_id"] or fe["api_calls"]:
                     frontends.append(fe)
 

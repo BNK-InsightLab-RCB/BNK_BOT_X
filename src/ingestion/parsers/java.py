@@ -10,14 +10,17 @@ import re
 from pathlib import Path
 
 _METHOD_RE = re.compile(
-    r"(?:public|private|protected)\s+[\w<>\[\],\s]+?\s+(\w+)\s*\(([^)]*)\)\s*(?:throws[^{]+)?\{"
+    r"(?:public|private|protected)\s+[^{;=]+?\s+(\w+)\s*"
+    r"\((?:[^{}]|\([^{}]*\))*\)\s*(?:throws[^{]+)?\{",
+    re.DOTALL,
 )
 _MAPPING_RE = re.compile(r'@(Get|Post|Put|Patch|Delete)Mapping\(\s*"([^"]*)"')
 _REQ_MAP_RE = re.compile(r'@RequestMapping\(\s*"([^"]+)"')
 _FIELD_RE = re.compile(r"\b(?:private|protected|public)\s+(?:final\s+)?([A-Z]\w+)\s+(\w+)\s*;")
 _CALL_RE = re.compile(r"(\w+)\.(\w+)\s*\(")
-_THROW_RE = re.compile(r'throw\s+new\s+\w+\(\s*"([^"]*)"\s*,\s*"([^"]*)"\s*\)')
-_IF_RE = re.compile(r"\bif\s*\((.*)\)\s*\{?\s*$")
+_THROW_RE = re.compile(r"throw\s+new\s+[\w.]+\s*\((.*?)\)\s*;?", re.DOTALL)
+_STRING_RE = re.compile(r'"([^"]*)"')
+_IF_START_RE = re.compile(r"\bif\s*\(")
 
 
 def _join_path(prefix: str, path: str) -> str:
@@ -66,25 +69,62 @@ def _head_before(text: str, start: int) -> list[str]:
     return out
 
 
+def _collect_if_condition(lines: list[str], start_idx: int) -> tuple[str, int]:
+    """start_idx의 if(...) 조건을 괄호 균형으로 모은다. 멀티라인 조건 대응."""
+    chunk = ""
+    depth = 0
+    started = False
+    for j in range(start_idx, len(lines)):
+        line = lines[j].strip()
+        pos = line.find("if") if not started else 0
+        for c in line[pos:]:
+            if c == "(":
+                depth += 1
+                started = True
+                if depth == 1:
+                    continue
+            elif c == ")":
+                depth -= 1
+                if depth == 0:
+                    return re.sub(r"\s+", " ", chunk).strip(), j
+            if started and depth >= 1:
+                chunk += c
+        chunk += " "
+    return re.sub(r"\s+", " ", chunk).strip(), start_idx
+
+
+def _parse_throw(line: str) -> tuple[str, str] | None:
+    tm = _THROW_RE.search(line)
+    if not tm:
+        return None
+    strings = _STRING_RE.findall(tm.group(1))
+    if len(strings) >= 2 and re.fullmatch(r"[A-Z][A-Z0-9_]*", strings[0]):
+        return strings[0], strings[1]
+    if strings:
+        return "", re.sub(r"\s+", " ", " ".join(strings)).strip()
+    return "", "처리 중 오류가 발생했습니다."
+
+
 def _failure_modes(body: str) -> list[dict]:
     """본문을 줄 단위로 훑어 직전 주석·조건을 throw에 묶는다."""
     fms: list[dict] = []
     last_comment = ""
     last_condition = ""
-    for raw in body.split("\n"):
+    lines = body.split("\n")
+    for i, raw in enumerate(lines):
         line = raw.strip()
         if line.startswith("//"):
             last_comment = line[2:].strip()
             continue
-        ifm = _IF_RE.search(line)
-        if ifm:
-            last_condition = ifm.group(1).strip()
-        thr = _THROW_RE.search(line)
-        if thr:
+        if _IF_START_RE.search(line):
+            last_condition, _ = _collect_if_condition(lines, i)
+        parsed = _parse_throw(line)
+        if parsed:
+            code, message = parsed
             fms.append(
                 {
-                    "error_code": thr.group(1),
-                    "message": thr.group(2),
+                    "error_code": code,
+                    "message": message,
                     "condition": last_condition,
                     "comment": last_comment,
                 }
