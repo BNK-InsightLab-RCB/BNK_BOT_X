@@ -10,6 +10,7 @@ import argparse
 import json
 
 from src.config import settings
+from src.chat.retriever import Retriever
 from src.ingestion.embedder import Embedder
 from src.ingestion.graph_store import GraphStore
 from src.ingestion.indexer import Indexer
@@ -57,10 +58,13 @@ def main() -> None:
     print(f"lineage graph: {graph.count()} manuals")
 
     print("\n=== 적재 확인: retrieve('경비집행내역 저장이 안돼요', role=branch) ===")
-    hits = store.search(embedder.embed_one("경비집행내역 저장이 안돼요"), top_k=3, role="branch")
+    hits = Retriever(embedder, store).retrieve("경비집행내역 저장이 안돼요", top_k=3, role="branch")
     for h in hits:
-        p = h.payload
-        print(f"  score={h.score:.3f}  {p['manual_id']}  ({p['screen_ko']} / {p['action']})")
+        p = h["payload"]
+        print(
+            f"  score={h['score']:.3f}  dense={h['dense']:.3f}  lexical={h['lexical']:.3f}  "
+            f"{p['manual_id']}  ({p['screen_ko']} / {p['action']})"
+        )
 
 
 if __name__ == "__main__":

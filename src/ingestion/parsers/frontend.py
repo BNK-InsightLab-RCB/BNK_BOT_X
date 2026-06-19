@@ -125,7 +125,7 @@ def parse_frontend(path: Path, index: dict[str, Any] | None = None) -> dict:
         key = (call["http_method"], call["api_path"])
         if key not in seen:
             seen.add(key)
-            calls.append(dict(call))
+            calls.append({**call, "fn": fn})  # fn = 의미있는 액션명(executeLoan 등)
 
     return {
         "screen_id": sid.group(1) if sid else (_screen_id_from_route(route_path, component) if route_path or calls else ""),

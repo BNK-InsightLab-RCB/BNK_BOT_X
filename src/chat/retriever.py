@@ -7,6 +7,40 @@
 from __future__ import annotations
 
 
+_ACTION_TERMS = {
+    "save": ("save", "create", "register", "저장", "등록", "입력", "생성"),
+    "approve": ("approve", "approval", "승인", "결재"),
+    "open": ("open", "개설"),
+    "issue": ("issue", "발급", "발행"),
+    "execute": ("execute", "exec", "실행", "처리"),
+    "subscribe": ("subscribe", "가입"),
+    "transfer": ("transfer", "송금", "이체"),
+    "discount": ("discount", "할인"),
+    "calculate": ("calculate", "calc", "계산", "산출"),
+    "get": ("get", "list", "search", "find", "조회", "검색", "상세", "목록"),
+}
+
+
+def _action_families(text: str) -> set[str]:
+    normalized = (text or "").lower()
+    return {family for family, terms in _ACTION_TERMS.items() if any(t.lower() in normalized for t in terms)}
+
+
+def _action_match(question: str, payload: dict) -> tuple[bool, bool]:
+    query_families = _action_families(question)
+    if not query_families:
+        return False, False
+    target = " ".join(
+        str(payload.get(k) or "") for k in ("action", "api_path", "screen_ko", "screen_id")
+    )
+    return True, bool(query_families & _action_families(target))
+
+
+def _action_bonus(question: str, payload: dict) -> float:
+    _, matched = _action_match(question, payload)
+    return 0.20 if matched else 0.0
+
+
 class Retriever:
     def __init__(self, embedder, store):
         self.embedder = embedder
@@ -46,12 +80,16 @@ class Retriever:
         for item in hits_by_id.values():
             lexical = min(item["sparse_score"] / q_len, 1.0)
             dense = item["dense"]
+            action_intent, action_match = _action_match(question, item["payload"])
+            action_bonus = _action_bonus(question, item["payload"])
             hits.append(
                 {
                     "payload": item["payload"],
                     "dense": dense,
                     "lexical": lexical,
-                    "score": dense + 0.5 * lexical,
+                    "action_intent": action_intent,
+                    "action_match": action_match,
+                    "score": dense + lexical + action_bonus,
                 }
             )
         hits.sort(key=lambda x: x["score"], reverse=True)

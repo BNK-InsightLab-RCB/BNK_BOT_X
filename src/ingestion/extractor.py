@@ -80,7 +80,8 @@ class Extractor:
         for fe in frontends:
             for call in fe["api_calls"]:
                 api_path = call["api_path"]
-                action = api_path.rstrip("/").split("/")[-1]
+                # 액션 = 프론트 api 함수명(executeLoan·openAccount…) > 경로 마지막 조각(폴백, {id}·products 회피)
+                action = call.get("fn") or api_path.rstrip("/").split("/")[-1]
                 ctrl = controllers.get(api_path)
                 service_call = ctrl["service_call"] if ctrl else None
                 svc = services.get(service_call) if service_call else None

@@ -50,6 +50,19 @@ def is_branch_clean(md: str) -> bool:
     return not any(p.search(md) for p in _INTERNAL) and "STATUS" not in md and "hasAuthority" not in md
 
 
+def is_manual_candidate(op: ExtractedOperation) -> bool:
+    """매뉴얼 생성 대상 여부.
+
+    실패 조건이 없는 단순 조회/드롭다운 API는 정밀도 게이트의 노이즈가 되므로
+    Extractor 원자료에는 남기되 사용자에게 적재되는 매뉴얼에서는 제외한다.
+    """
+    return bool(op.failure_modes)
+
+
+def manual_candidates(ops: list[ExtractedOperation]) -> list[ExtractedOperation]:
+    return [op for op in ops if is_manual_candidate(op)]
+
+
 def _code_annot(condition: str, notation: dict) -> str:
     annots: list[str] = []
     for n in notation.values():

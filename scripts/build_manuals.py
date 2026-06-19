@@ -12,7 +12,25 @@ from dataclasses import asdict
 
 from src.config import settings
 from src.ingestion.extractor import Extractor
-from src.ingestion.manual import ManualBuilder
+from src.ingestion.manual import ManualBuilder, manual_candidates
+
+
+def _manual_id_from_output(path) -> str:
+    name = path.name
+    for suffix in (".branch.md", ".it.md", ".json"):
+        if name.endswith(suffix):
+            return name[: -len(suffix)]
+    return path.stem
+
+
+def _remove_stale_outputs(out_dir, keep_ids: set[str]) -> int:
+    removed = 0
+    for pattern in ("manual_*.json", "manual_*.branch.md", "manual_*.it.md"):
+        for p in out_dir.glob(pattern):
+            if _manual_id_from_output(p) not in keep_ids:
+                p.unlink()
+                removed += 1
+    return removed
 
 
 def main() -> None:
@@ -22,12 +40,18 @@ def main() -> None:
     args = ap.parse_args()
 
     ops = Extractor().extract(settings.source_dir)
+    candidate_ops = manual_candidates(ops)
     builder = ManualBuilder()
     out_dir = settings.manuals_dir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    for op in ops:
-        m = builder.build(op, use_llm=not args.no_llm)
+    manuals = [builder.build(op, use_llm=not args.no_llm) for op in candidate_ops]
+    removed = _remove_stale_outputs(out_dir, {m.id for m in manuals})
+
+    skipped = len(ops) - len(candidate_ops)
+    print(f"extracted {len(ops)} ops; manual candidates {len(candidate_ops)}; skipped {skipped}; stale removed {removed}")
+
+    for m in manuals:
         if args.freeze:
             m.status = "frozen"
         (out_dir / f"{m.id}.json").write_text(

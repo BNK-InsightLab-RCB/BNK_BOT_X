@@ -7,12 +7,29 @@ from __future__ import annotations
 
 
 class PrecisionGate:
-    def __init__(self, t_dense: float = 0.50, t_lexical: float = 0.40):
-        self.t_dense = t_dense
+    def __init__(
+        self,
+        t_dense_high: float = 0.58,
+        t_dense_low: float = 0.50,
+        t_lexical: float = 0.40,
+        t_lexical_support: float = 0.15,
+    ):
+        self.t_dense_high = t_dense_high
+        self.t_dense_low = t_dense_low
         self.t_lexical = t_lexical
+        self.t_lexical_support = t_lexical_support
 
     def passes(self, hits: list[dict]) -> bool:
+        """강한 의미매칭(dense) 또는 강한 표기매칭(lexical) 단독 통과.
+        borderline 의미(0.50~0.58)는 표기 뒷받침을 요구 → 도메인 무매칭 오답을 회피로 보낸다.
+        """
         if not hits:
             return False
-        top = hits[0]
-        return top["dense"] >= self.t_dense or top["lexical"] >= self.t_lexical
+        if hits[0].get("action_intent") and not hits[0].get("action_match"):
+            return False
+        d, lx = hits[0]["dense"], hits[0]["lexical"]
+        return (
+            d >= self.t_dense_high
+            or lx >= self.t_lexical
+            or (d >= self.t_dense_low and lx >= self.t_lexical_support)
+        )

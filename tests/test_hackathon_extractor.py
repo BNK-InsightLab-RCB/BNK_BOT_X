@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from src.ingestion.extractor import Extractor
+from src.ingestion.manual import manual_candidates
 
 SRC = Path(__file__).resolve().parents[2] / "00.BNK_Hackathon"
 
@@ -32,6 +33,34 @@ def test_hackathon_react_service_layer_extracts_operations():
     assert "/api/loan/execute" in apis
     assert "/api/deposit/open" in apis
     assert "/api/card/issue" in apis
+
+
+def test_hackathon_actions_prefer_frontend_api_function_names():
+    ops = _ops()
+    assert not [op.action for op in ops if "{" in op.action or "}" in op.action]
+
+    customers = [op for op in ops if op.api_path == "/api/customer/{custNo}"]
+    assert customers
+    assert {op.action for op in customers} == {"getCustomer"}
+
+    deposit_open = next(op for op in ops if op.api_path == "/api/deposit/open")
+    assert deposit_open.action == "openAccount"
+
+
+def test_hackathon_manual_candidates_drop_zero_failure_lookup_ops():
+    candidates = manual_candidates(_ops())
+    apis = {op.api_path for op in candidates}
+
+    assert candidates
+    assert all(op.failure_modes for op in candidates)
+    assert "/api/deposit/open" in apis
+    assert "/api/loan/execute" in apis
+    assert "/api/accounting/voucher" in apis
+
+    assert "/api/deposit/products" not in apis
+    assert "/api/loan/products" not in apis
+    assert "/api/forex/rates" not in apis
+    assert "/api/receipt/templates" not in apis
 
 
 def test_hackathon_loan_execute_lineage():
