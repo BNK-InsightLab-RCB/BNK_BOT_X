@@ -37,10 +37,11 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-llm", action="store_true", help="Qwen 없이 정적 생성")
     ap.add_argument("--freeze", action="store_true", help="status=frozen 으로 동결")
+    ap.add_argument("--include-display", action="store_true", help="조회/표시 항목 의미 매뉴얼도 생성")
     args = ap.parse_args()
 
     ops = Extractor().extract(settings.source_dir)
-    candidate_ops = manual_candidates(ops)
+    candidate_ops = manual_candidates(ops, include_display=args.include_display)
     builder = ManualBuilder()
     out_dir = settings.manuals_dir
     out_dir.mkdir(parents=True, exist_ok=True)

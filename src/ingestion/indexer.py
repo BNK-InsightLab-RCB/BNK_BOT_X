@@ -35,6 +35,7 @@ def sparse_text_for_manual(manual: Manual, role: str) -> str:
         manual.screen_id,
         manual.screen_ko,
         manual.action,
+        manual.manual_type,
         manual.api_path or "",
         " ".join(manual.table_en),
         " ".join(manual.table_ko),

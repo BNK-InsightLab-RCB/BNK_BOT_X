@@ -25,6 +25,8 @@ class PrecisionGate:
         """
         if not hits:
             return False
+        if hits[0].get("manual_type_intent") and not hits[0].get("manual_type_match"):
+            return False
         if hits[0].get("collection_intent") and not hits[0].get("collection_match"):
             return False
         if hits[0].get("action_intent") and not hits[0].get("action_match"):

@@ -22,6 +22,10 @@ _METHOD = re.compile(r"\b[A-Z][A-Za-z0-9]+\.[A-Za-z0-9_]+\b")
 _PAREN_ID = re.compile(r"\s*\([^)]*(?:[A-Z]{2,}|=)[^)]*\)")
 _AUTH = re.compile(r"hasAuthority\([^)]*\)", re.IGNORECASE)
 _INTERNAL = (_TB, _API, _ECODE, _METHOD)
+_DISPLAY_ACTION_RE = re.compile(
+    r"(?:^get|^search|list|history|products|accounts|templates|rates|transfers|subscriptions|transactions)",
+    re.IGNORECASE,
+)
 
 BRANCH_SYS = (
     "너는 은행 영업점 담당자를 돕는 업무 안내 작성자다. 아래 초안과 *같은 내용*을 더 자연스러운 한국어로 다듬어라.\n"
@@ -59,7 +63,111 @@ def is_manual_candidate(op: ExtractedOperation) -> bool:
     return bool(op.failure_modes)
 
 
-def manual_candidates(ops: list[ExtractedOperation]) -> list[ExtractedOperation]:
+def is_display_candidate(op: ExtractedOperation) -> bool:
+    """화면 표시/항목 의미 매뉴얼 생성 대상 여부."""
+    if op.failure_modes or not op.table_en:
+        return False
+    surface = " ".join([op.action or "", op.api_path or ""])
+    return bool(_DISPLAY_ACTION_RE.search(surface))
+
+
+def manual_candidates(ops: list[ExtractedOperation], include_display: bool = False) -> list[ExtractedOperation]:
+    if not include_display:
+        return [op for op in ops if is_manual_candidate(op)]
+    return [op for op in ops if is_manual_candidate(op) or is_display_candidate(op)]
+
+
+def _manual_type_for(op: ExtractedOperation) -> str:
+    return "failure" if is_manual_candidate(op) else "display"
+
+
+def _display_comment_for_branch(comment: str, codes: dict[str, str]) -> str:
+    text = re.sub(r"\([^)]*(?:[A-Z0-9_]+:)[^)]*\)", "", comment or "").strip()
+    if codes:
+        meanings = ", ".join(dict.fromkeys(v.strip() for v in codes.values() if v.strip()))
+        if meanings:
+            text = f"{text}: {meanings}" if text else meanings
+    return text or comment
+
+
+def _columns_for_display(op: ExtractedOperation, table: str, columns: dict[str, str]) -> list[str]:
+    selected = op.display_columns.get(table) or []
+    if selected:
+        return [c for c in selected if c in columns]
+    return list(columns)
+
+
+def _static_display_branch(op: ExtractedOperation) -> str:
+    table_names = ", ".join(op.table_ko or op.table_en)
+    lines = [
+        f"# {op.screen_ko} — 화면 표시 항목",
+        "",
+        f"{op.screen_ko} 화면은 {table_names} 정보를 기준으로 표시됩니다.",
+        "",
+        "## 주요 표시 항목",
+    ]
+    added = 0
+    for table, n in op.notation.items():
+        columns = n.get("columns", {})
+        codes_by_col = n.get("code_values", {})
+        for col in _columns_for_display(op, table, columns):
+            meaning = _display_comment_for_branch(columns.get(col, ""), codes_by_col.get(col, {}))
+            if not meaning:
+                continue
+            lines.append(f"- {meaning}")
+            added += 1
+    if not added:
+        lines.append(f"- {table_names}")
+    lines += [
+        "",
+        "## 안내 범위",
+        "이 매뉴얼은 화면에 표시되는 항목의 의미를 설명합니다. 조회 실패 원인은 코드에서 확인된 실패 조건이 있을 때만 별도 매뉴얼에서 안내합니다.",
+    ]
+    return "\n".join(lines)
+
+
+def _static_display_it(op: ExtractedOperation) -> str:
+    lines = [
+        f"# {op.screen_ko} / {op.action} 표시 항목 (IT)",
+        "",
+        "## 조회 흐름",
+        " → ".join(op.lineage),
+        "",
+        "## 표시 컬럼",
+    ]
+    for table, n in op.notation.items():
+        columns = n.get("columns", {})
+        codes_by_col = n.get("code_values", {})
+        selected = _columns_for_display(op, table, columns)
+        if not selected:
+            continue
+        lines.append(f"### {table}")
+        for col in selected:
+            comment = columns.get(col, "")
+            suffix = ""
+            if codes_by_col.get(col):
+                suffix = " (" + ", ".join(f"{k}={v}" for k, v in codes_by_col[col].items()) + ")"
+            lines.append(f"- {col}: {comment}{suffix}")
+    lines += [
+        "",
+        "## 안내 범위",
+        "실패 조건이 추출되지 않은 조회/표시 매뉴얼이다. 조회 실패 원인은 이 매뉴얼에서 단정하지 않는다.",
+    ]
+    return "\n".join(lines)
+
+
+def build_manual_id(op: ExtractedOperation, manual_type: str) -> str:
+    suffix = op.action
+    if manual_type == "display":
+        suffix = f"{suffix}_display"
+    return f"manual_{op.screen_id.lower()}_{suffix}"
+
+
+def display_manual_candidates(ops: list[ExtractedOperation]) -> list[ExtractedOperation]:
+    return [op for op in ops if is_display_candidate(op)]
+
+
+def failure_manual_candidates(ops: list[ExtractedOperation]) -> list[ExtractedOperation]:
     return [op for op in ops if is_manual_candidate(op)]
 
 
@@ -125,10 +233,15 @@ class ManualBuilder:
         except GeneratorError:
             return None
 
-    def build(self, op: ExtractedOperation, use_llm: bool = True) -> Manual:
-        branch = _static_branch(op)
-        it = _static_it(op)
-        if use_llm:
+    def build(self, op: ExtractedOperation, use_llm: bool = True, manual_type: str | None = None) -> Manual:
+        manual_type = manual_type or _manual_type_for(op)
+        if manual_type == "display":
+            branch = _static_display_branch(op)
+            it = _static_display_it(op)
+        else:
+            branch = _static_branch(op)
+            it = _static_it(op)
+        if use_llm and manual_type == "failure":
             polished_b = self._polish(BRANCH_SYS, branch)
             if polished_b and is_branch_clean(polished_b):  # LLM 출력이 새지 않을 때만 채택
                 branch = polished_b
@@ -136,16 +249,21 @@ class ManualBuilder:
             if polished_it:
                 it = polished_it
         return Manual(
-            id=f"manual_{op.screen_id.lower()}_{op.action}",
+            id=build_manual_id(op, manual_type),
             screen_id=op.screen_id,
             screen_ko=op.screen_ko,
             action=op.action,
+            manual_type=manual_type,
             api_path=op.api_path,
             table_en=op.table_en,
             table_ko=op.table_ko,
             branch_md=branch,
             it_md=it,
-            facts={"failure_modes": [asdict(fm) for fm in op.failure_modes], "notation": op.notation},
+            facts={
+                "failure_modes": [asdict(fm) for fm in op.failure_modes],
+                "notation": op.notation,
+                "display_columns": op.display_columns,
+            },
             lineage_ref=op.lineage,
             provenance=op.provenance,
             status="draft",

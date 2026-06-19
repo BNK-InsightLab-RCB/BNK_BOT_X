@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from src.ingestion.extractor import Extractor
-from src.ingestion.manual import manual_candidates
+from src.ingestion.manual import ManualBuilder, display_manual_candidates, manual_candidates
 
 SRC = Path(__file__).resolve().parents[2] / "00.BNK_Hackathon"
 
@@ -61,6 +61,29 @@ def test_hackathon_manual_candidates_drop_zero_failure_lookup_ops():
     assert "/api/loan/products" not in apis
     assert "/api/forex/rates" not in apis
     assert "/api/receipt/templates" not in apis
+
+
+def test_hackathon_display_candidates_cover_lookup_ops_without_failures():
+    candidates = display_manual_candidates(_ops())
+    apis = {op.api_path for op in candidates}
+
+    assert "/api/loan/history" in apis
+    assert "/api/loan/products" in apis
+    assert "/api/deposit/products" in apis
+    assert all(not op.failure_modes for op in candidates)
+
+
+def test_hackathon_display_manual_uses_selected_columns_and_notation():
+    op = next(op for op in display_manual_candidates(_ops()) if op.api_path == "/api/loan/history")
+    manual = ManualBuilder().build(op, use_llm=False, manual_type="display")
+
+    assert manual.manual_type == "display"
+    assert manual.id == "manual_loan_execute_getHistory_display"
+    assert "대출실행내역" in manual.branch_md
+    assert "대출실행금액" in manual.branch_md
+    assert "적용금리" in manual.branch_md
+    assert "정상" in manual.branch_md
+    assert "TB_LOAN_EXEC" in manual.it_md
 
 
 def test_hackathon_loan_execute_lineage():

@@ -20,7 +20,23 @@ _ACTION_TERMS = {
     "get": ("get", "list", "search", "find", "조회", "검색", "상세", "목록"),
 }
 _COLLECTION_QUERY_TERMS = ("이력", "목록", "리스트", "내역 조회", "조회 내역", "history", "list")
-_COLLECTION_TARGET_TERMS = (
+_COLLECTION_QUERY_FAMILIES = {
+    "history": ("이력", "내역", "history"),
+    "product": ("상품", "product"),
+    "account": ("계좌", "account"),
+    "rate": ("환율", "rate"),
+    "template": ("장표", "템플릿", "template", "receipt"),
+    "code": ("코드", "계정과목", "code"),
+}
+_COLLECTION_TARGET_FAMILIES = {
+    "history": ("history", "list", "search", "transactions", "subscriptions", "transfers", "vouchers", "receipts"),
+    "product": ("products",),
+    "account": ("accounts",),
+    "rate": ("rates",),
+    "template": ("templates", "receipts"),
+    "code": ("codes",),
+}
+_COLLECTION_GENERIC_TARGET_TERMS = (
     "history",
     "list",
     "search",
@@ -30,8 +46,20 @@ _COLLECTION_TARGET_TERMS = (
     "subscriptions",
     "receipts",
     "transactions",
-    "이력",
-    "목록",
+)
+_FAILURE_QUERY_TERMS = ("안돼", "안 되", "오류", "에러", "실패", "불가", "막혀", "안보", "안 보")
+_DISPLAY_QUERY_TERMS = (
+    "무슨 뜻",
+    "의미",
+    "뜻이야",
+    "뜻인가",
+    "표시",
+    "항목",
+    "상태값",
+    "기준",
+    "뭐야",
+    "무엇",
+    "설명",
 )
 
 
@@ -63,7 +91,44 @@ def _collection_match(question: str, payload: dict) -> tuple[bool, bool]:
     target = " ".join(
         str(payload.get(k) or "").lower() for k in ("action", "api_path", "screen_ko", "screen_id")
     )
-    return True, any(term.lower() in target for term in _COLLECTION_TARGET_TERMS)
+    query_families = {
+        family
+        for family, terms in _COLLECTION_QUERY_FAMILIES.items()
+        if any(term.lower() in q for term in terms)
+    }
+    if query_families:
+        for family in query_families:
+            if any(term.lower() in target for term in _COLLECTION_TARGET_FAMILIES[family]):
+                return True, True
+        return True, False
+    return True, any(term.lower() in target for term in _COLLECTION_GENERIC_TARGET_TERMS)
+
+
+def _collection_bonus(question: str, payload: dict) -> float:
+    intent, matched = _collection_match(question, payload)
+    return 0.15 if intent and matched else 0.0
+
+
+def _query_manual_type_intent(question: str) -> tuple[bool, bool]:
+    q = question or ""
+    failure_intent = any(term in q for term in _FAILURE_QUERY_TERMS)
+    display_intent = any(term in q for term in _DISPLAY_QUERY_TERMS)
+    return failure_intent, display_intent
+
+
+def _manual_type_match(question: str, payload: dict) -> tuple[bool, bool]:
+    failure_intent, display_intent = _query_manual_type_intent(question)
+    manual_type = payload.get("manual_type") or "failure"
+    if failure_intent:
+        return True, manual_type == "failure"
+    if display_intent:
+        return True, manual_type == "display"
+    return False, False
+
+
+def _manual_type_bonus(question: str, payload: dict) -> float:
+    intent, matched = _manual_type_match(question, payload)
+    return 0.25 if intent and matched else 0.0
 
 
 class Retriever:
@@ -107,7 +172,10 @@ class Retriever:
             dense = item["dense"]
             action_intent, action_match = _action_match(question, item["payload"])
             collection_intent, collection_match = _collection_match(question, item["payload"])
+            manual_type_intent, manual_type_match = _manual_type_match(question, item["payload"])
             action_bonus = _action_bonus(question, item["payload"])
+            collection_bonus = _collection_bonus(question, item["payload"])
+            manual_type_bonus = _manual_type_bonus(question, item["payload"])
             hits.append(
                 {
                     "payload": item["payload"],
@@ -117,7 +185,9 @@ class Retriever:
                     "action_match": action_match,
                     "collection_intent": collection_intent,
                     "collection_match": collection_match,
-                    "score": dense + lexical + action_bonus,
+                    "manual_type_intent": manual_type_intent,
+                    "manual_type_match": manual_type_match,
+                    "score": dense + lexical + action_bonus + collection_bonus + manual_type_bonus,
                 }
             )
         hits.sort(key=lambda x: x["score"], reverse=True)

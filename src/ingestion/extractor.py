@@ -88,10 +88,16 @@ class Extractor:
                 mapper_calls = svc["mapper_calls"] if svc else []
 
                 tables: list[str] = []
+                display_columns: dict[str, list[str]] = {}
                 for mc in mapper_calls:
                     mb = mybatis.get(mc)
                     if mb:
                         tables += mb["tables"]
+                        for tbl, cols in mb.get("columns_by_table", {}).items():
+                            if tbl == "_UNKNOWN":
+                                continue
+                            display_columns.setdefault(tbl, [])
+                            display_columns[tbl] = _uniq(display_columns[tbl] + cols)
                 tables = _uniq(tables)
                 table_ko = _uniq(ddl[t]["table_ko"] for t in tables if ddl.get(t, {}).get("table_ko"))
                 notation = {
@@ -144,6 +150,7 @@ class Extractor:
                         failure_modes=fms,
                         comments=comments,
                         notation=notation,
+                        display_columns=display_columns,
                         provenance=[Provenance(path=x) for x in prov_paths],
                     )
                 )

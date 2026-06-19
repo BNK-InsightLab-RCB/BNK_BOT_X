@@ -48,3 +48,16 @@ def test_gate_rejects_collection_query_when_top_hit_is_not_collection_lookup():
     }
 
     assert not gate.passes([hit])
+
+
+def test_gate_rejects_manual_type_mismatch_before_score_thresholds():
+    gate = PrecisionGate()
+
+    hit = {
+        "dense": 0.75,
+        "lexical": 0.45,
+        "manual_type_intent": True,
+        "manual_type_match": False,
+    }
+
+    assert not gate.passes([hit])

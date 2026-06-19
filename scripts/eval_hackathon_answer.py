@@ -5,9 +5,10 @@
   PYTHONPATH=. .venv/bin/python scripts/load_manuals.py --recreate
 
 평가 범위:
-- 주요 업무 오류 질문은 맞는 Hackathon 매뉴얼을 top으로 두고 답변 가능해야 한다.
+- 주요 업무 오류 질문은 맞는 Hackathon failure 매뉴얼을 top으로 두고 답변 가능해야 한다.
 - 조회/목록/이력처럼 매뉴얼 후보에서 제외된 질문과 도메인 밖 질문은 handoff 되어야 한다.
 - 답변은 LLM 대신 승인 매뉴얼 기반 결정론 fallback으로 생성해 검색/게이트 회귀만 안정적으로 본다.
+--include-display 적재 상태에서도 필수 failure 매뉴얼 회귀를 그대로 확인할 수 있다.
 """
 from __future__ import annotations
 
@@ -136,13 +137,10 @@ def _preflight(store: QdrantStore) -> list[str]:
     errors: list[str] = []
     loaded_ids = _loaded_manual_ids()
     missing = sorted(EXPECTED_MANUALS - loaded_ids)
-    extra = sorted(loaded_ids - EXPECTED_MANUALS)
     if missing:
         errors.append(f"missing Hackathon manuals in data/manuals: {missing}")
-    if extra:
-        errors.append(f"unexpected manuals in data/manuals: {extra}")
     count = store.count()
-    expected_points = len(EXPECTED_MANUALS) * 2
+    expected_points = len(loaded_ids) * 2
     if count != expected_points:
         errors.append(f"qdrant point count={count}, expected={expected_points}")
     return errors

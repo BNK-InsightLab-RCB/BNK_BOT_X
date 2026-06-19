@@ -47,6 +47,7 @@ class ExtractedOperation:
     failure_modes: list[FailureMode] = field(default_factory=list)
     comments: list[str] = field(default_factory=list)  # 코드 위치에 묶인 한글 주석
     notation: dict[str, Any] = field(default_factory=dict)  # 표기의미: {table: {columns, code_values}}
+    display_columns: dict[str, list[str]] = field(default_factory=dict)  # 조회 SQL 기준 표시 컬럼
     provenance: list[Provenance] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -61,6 +62,7 @@ class Manual:
     screen_id: str
     screen_ko: str = ""
     action: str = ""
+    manual_type: str = "failure"  # failure | display
     api_path: str | None = None
     table_en: list[str] = field(default_factory=list)
     table_ko: list[str] = field(default_factory=list)
@@ -94,6 +96,7 @@ class Manual:
             "screen_id": self.screen_id,
             "screen_ko": self.screen_ko,
             "action": self.action,
+            "manual_type": self.manual_type,
             "api_path": self.api_path,
             "table_en": self.table_en,
             "table_ko": self.table_ko,
