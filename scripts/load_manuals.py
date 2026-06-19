@@ -11,11 +11,22 @@ import json
 
 from src.config import settings
 from src.chat.retriever import Retriever
+from src.chat.service import _is_bad_generated_answer
 from src.ingestion.embedder import Embedder
 from src.ingestion.graph_store import GraphStore
 from src.ingestion.indexer import Indexer
+from src.ingestion.manual import is_branch_clean
 from src.ingestion.qdrant_store import QdrantStore
 from src.models import Manual
+
+
+def _invalid_manual_reasons(manual: Manual) -> list[str]:
+    reasons: list[str] = []
+    if _is_bad_generated_answer(manual.branch_md):
+        reasons.append("bad branch body")
+    if not is_branch_clean(manual.branch_md):
+        reasons.append("branch leak")
+    return reasons
 
 
 def main() -> None:
@@ -35,6 +46,14 @@ def main() -> None:
         if not manuals:
             print("frozen 매뉴얼 없음 — review_manuals.py로 승인 먼저 (또는 --include-draft)")
             return
+
+    invalid = [(m.id, _invalid_manual_reasons(m)) for m in manuals]
+    invalid = [(mid, reasons) for mid, reasons in invalid if reasons]
+    if invalid:
+        print("적재 불가: 품질 검증에 실패한 매뉴얼이 있습니다.")
+        for mid, reasons in invalid:
+            print(f"  - {mid}: {', '.join(reasons)}")
+        return
 
     store = QdrantStore(
         settings.qdrant_url, settings.qdrant_collection_name,

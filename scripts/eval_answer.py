@@ -13,16 +13,31 @@ import sys
 from src.chat.gate import PrecisionGate
 from src.chat.generator import Generator
 from src.chat.retriever import Retriever
-from src.chat.service import ChatService
+from src.chat.service import ChatService, _is_bad_generated_answer
 from src.config import settings
 from src.ingestion.embedder import Embedder
 from src.ingestion.manual import is_branch_clean
 from src.ingestion.qdrant_store import QdrantStore
 
 CASES = [
-    {"q": "경비집행내역 저장이 안돼요", "manual": "manual_expense_register_save", "handoff": False},
-    {"q": "예산집행내역 등록이 안돼요", "manual": "manual_budget_register_save", "handoff": False},
-    {"q": "경비 승인하려는데 안돼요", "manual": "manual_expense_approve_approve", "handoff": False},
+    {
+        "q": "경비집행내역 저장이 안돼요",
+        "manual": "manual_expense_register_save",
+        "handoff": False,
+        "keywords": ("권한", "마감", "금액"),
+    },
+    {
+        "q": "예산집행내역 등록이 안돼요",
+        "manual": "manual_budget_register_save",
+        "handoff": False,
+        "keywords": ("권한", "한도"),
+    },
+    {
+        "q": "경비 승인하려는데 안돼요",
+        "manual": "manual_expense_approve_approve",
+        "handoff": False,
+        "keywords": ("권한", "등록"),
+    },
     {"q": "비밀번호 어떻게 바꿔요", "manual": None, "handoff": True},
     {"q": "휴가 신청은 어디서 하나요", "manual": None, "handoff": True},
 ]
@@ -55,6 +70,11 @@ def main() -> int:
                 reasons.append(f"top={top}!={c['manual']}")
             if not is_branch_clean(resp.answer):
                 reasons.append("branch leak")
+            if _is_bad_generated_answer(resp.answer):
+                reasons.append("bad generated answer")
+            missing = [kw for kw in c.get("keywords", ()) if kw not in resp.answer]
+            if missing:
+                reasons.append(f"missing keywords={missing}")
         ok = not reasons
         passed += ok
         print(f"  [{'PASS' if ok else 'FAIL'}] {c['q']}" + (f"  ({'; '.join(reasons)})" if reasons else ""))
