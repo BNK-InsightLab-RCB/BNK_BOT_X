@@ -3,9 +3,9 @@
 은행 업무 담당자가 **사내 프로그램을 쓰다 막힐 때**(오류·업무흐름·화면 표기 의미·다음 단계·화면 간 데이터 차이) 지금은 개발자에게 전화로 묻는 질문을, **챗봇이 1차로 받아 답하고 못 푸는 것만 개발자에게 넘기는** 엔진.
 근거는 새로 저작하지 않고 **이미 있는 자산(소스코드·SQL·스키마·표준용어)을 변환**해서 만든다.
 
-> **Status: 슬라이스(P0~P5) 통과 ✅ + 엔진 보강 완료** — pytest 15/15 · eval_answer 5/5. **그래프 roll-up ✅ · 핸드오프 축적 ✅ · 검수·동결 워크플로우 ✅**. KURE 설치됨.
-> 샘플-무관 핵심 보강 완료. 다음 = (선택) 최소 UI / 진짜 sparse · (샘플 대기) **P6 파서 일반화** · (배포) 인증.
-> 코드: `src/`(엔진 전체 + 그래프 + 핸드오프 + 검수) · `examples/bank_sample/`(seed 3화면) · `scripts/`(eval_extract·build_manuals·review_manuals·load_manuals·eval_query·eval_answer) · `tests/`(15) · `data/` · `.venv/`.
+> **Status: 엔진 거의 완성** — pytest 22/22 · eval_answer 5/5 · eval_identifier 10/10. 슬라이스(P0~P5) ✅ · 그래프 roll-up ✅ · 핸드오프 축적 ✅ · **검수·동결·편집(admin 매뉴얼 CRUD) ✅** · 진짜 sparse ✅. **P6: 실 코드(`00.BNK_Hackathon`)에서 *추출* 34 ops ✅**.
+> 남은 것 = (엔진) **P6 풀 파이프라인**(hackathon 34개 → 매뉴얼→적재→질의) · 표기의미 COMMENT 확인 / (외부) **UI** → **§🔌 외부 연동 가이드 참조** / (배포) 인증.
+> 코드: `src/`(엔진 전체) · `examples/bank_sample/`(toy 3화면) · `../00.BNK_Hackathon`(실코드 P6 대상) · `scripts/`(…·eval_identifier·…) · `tests/`(20) · `data/` · `.venv/`.
 > 실행: `docker compose up -d`(Qdrant 6335) → `uvicorn src.main:app --port 9000`.
 > 게이트: `pytest` + `python scripts/eval_answer.py`. 빌드·적재: `build_manuals.py` → `load_manuals.py`.
 > 형제 프로젝트: `../BNK_Bot`(원본, 약관/설명서 PDF RAG — 참고 대상) · `../BNK_Bot_S`(소스-aware 프로토타입 — 참고 대상).
@@ -177,7 +177,7 @@ LLM은 무에서 짓는 게 아니라 추출된 사실을 요약하는 역할이
 - **`branch_md` / `it_md`** — 역할별 Markdown 산문. 임베딩·답변의 원천. 숫자·조건은 verbatim 보존.
 - **구조 필드** — Qdrant payload(`screen_id`/`table_en`/`table_ko`/`action`/`role`) + lineage 그래프 링크(`lineage_ref`) + 근거(`provenance`).
 - **Qdrant 적재:** role별 포인트 분리(role=branch는 `branch_md` 임베딩, role=it는 `it_md`) → 질의 시 역할 안에서 검색.
-- **검수·동결(구현됨):** build→**draft** → `scripts/review_manuals.py` 승인 → **frozen** + 검수자·시각 + `data/review_log.jsonl`(감사). **load는 frozen만 적재**(draft는 사용자에게 안 닿음). 검토용 `.branch.md`/`.it.md` 동봉.
+- **검수·동결·편집(구현됨):** build→**draft** → 승인(`review_manuals.py` 또는 `POST /admin/manuals/{id}/approve`)→ **frozen** + 검수자·시각 + `data/review_log.jsonl`(감사). **관리자 편집** `PUT /admin/manuals/{id}` → version+1·감사·재적재. **load는 frozen만 적재**(draft는 사용자에게 안 닿음).
 
 ---
 
@@ -291,6 +291,60 @@ LLM은 무에서 짓는 게 아니라 추출된 사실을 요약하는 역할이
 - **lineage 저장소:** SQLite/그래프 (구조 탐색)
 - **코드 파서:** Java/Spring · MyBatis XML · SQL (AST 수준 지향; `BNK_Bot_S` 프로토타입은 regex라 한계였음)
 - **라이선스:** 전부 MIT/Apache 지향 (`BNK_Bot` 원칙 계승)
+
+---
+
+## 🔌 외부 연동 가이드 (UI/API — 다른 세션용 컨텍스트)
+
+> **이 섹션만 읽으면 엔진을 호출하는 외부 화면(프론트)·연동을 만들 수 있다.**
+> 엔진(FastAPI)은 *완성·동작 중*, 화면(UI)은 *아직 없음* → 지금 만들 대상.
+
+### 엔진 실행 (로컬)
+1. `docker compose up -d` — Qdrant(`localhost:6335`)
+2. Ollama에 `qwen3.5-bnk` 기동(없으면 답변이 매뉴얼 원문 폴백). `ollama serve` / `ollama list`
+3. (최초/변경 시) 적재: `PYTHONPATH=. python scripts/build_manuals.py` → `python scripts/review_manuals.py --approve-all` → `python scripts/load_manuals.py`
+4. `uvicorn src.main:app --port 9000` → Swagger `localhost:9000/docs`
+
+### API 계약
+
+**`POST /query`** — 질문 → 답변 (핵심)
+```jsonc
+요청 { "question": "경비집행내역 저장이 안돼요", "role": "branch", "top_k": 5 }
+응답 {
+  "answer": "## 가능한 원인 ...",   // Markdown — 렌더링할 것
+  "handoff": false,                 // true면 "근거 못 찾음 → 개발자 문의"
+  "sources": [{ "manual_id": "...", "screen_ko": "경비집행내역 등록", "action": "save", "score": 0.73 }],
+  "related": [{ "manual_id": "...", "screen_ko": "경비집행내역 승인", "action": "approve", "score": 0 }]
+}
+```
+- `role`: **`branch`**(영업점 — 내부 식별자 숨김·업무 언어) | **`it`**(IT — 기술 상세 노출). UI에 역할 토글.
+- `handoff: true` → `answer`는 회피 안내. 이때 질문은 서버에 **축적**(`/admin/handoffs`).
+- `sources`=답변 근거 매뉴얼, `related`=lineage 그래프로 연결된 관련 작업. 빈 질문 → `422`.
+
+**`GET /health`**
+```jsonc
+200 { "status": "ok"|"degraded", "points": 6, "collection": "bnk_ops_knowledge" }  // degraded = 적재 0
+503 { "status": "down", "reason": "qdrant unreachable" }
+```
+
+**관리:**
+- `POST /admin/ingest` → `{ source_dir, operations_found, manuals_built, status }`
+- `GET /admin/handoffs?status=open` → `{ open, total, items:[{id, ts, question, role, top_manual_id, top_score, status}] }` · `POST /admin/handoffs/{id}/resolve`
+- **매뉴얼 관리(편집):**
+  - `GET /admin/manuals` → `{ items:[{id, status, version, screen_ko, action, reviewed_at}] }`
+  - `GET /admin/manuals/{id}` → 단건(`branch_md`·`it_md`·`facts`·`status`·`version`)
+  - `PUT /admin/manuals/{id}` `{ branch_md?, it_md?, by }` → 수정 → `{version+1, reviewed_by, reindexed}` (frozen이면 Qdrant 재적재=라이브 반영)
+  - `POST /admin/manuals/{id}/approve?by=...` → draft→frozen + 재적재
+
+### ⚠️ 외부 작업 시 반드시 알 것
+- **CORS 미설정** — `main.py`에 CORS 미들웨어 없음. 다른 origin(예: Vite `localhost:5173`)에서 호출하려면 **`CORSMiddleware` 추가 필요**(또는 프록시/같은 origin).
+- **`answer`는 Markdown** → 마크다운 렌더러로 표시.
+- **인증 없음** — `role`을 클라이언트가 *자가 선언*. 실서비스는 서버측 권한 결정 필요(미구현).
+- **스트리밍 없음** — `/query`는 단발 응답, Qwen 생성으로 수 초 가능(로딩 표시 권장).
+
+### UI 최소 구성 제안
+- 입력창 + 역할 토글(영업점/IT) → `POST /query` → 답변(Markdown) + handoff 배지 + 근거(sources) + 관련작업(related)
+- (관리) 핸드오프 목록(`/admin/handoffs`) + **매뉴얼 편집 화면**(`GET/PUT /admin/manuals/{id}`) — 생성된 매뉴얼을 관리자가 보고 고쳐 재적재
 
 ---
 

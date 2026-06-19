@@ -1,8 +1,8 @@
-"""검수·동결 — draft → approve → frozen + 감사 로그 (결정론)."""
+"""검수·동결·편집 — draft → approve → frozen, 편집 + 감사 로그 (결정론)."""
 import json
 from dataclasses import asdict
 
-from src.ingestion.review import approve, approve_all, list_status
+from src.ingestion.review import approve, approve_all, edit, list_status, read
 from src.models import Manual
 
 
@@ -41,3 +41,24 @@ def test_approve_missing(tmp_path):
     d = tmp_path / "manuals"
     d.mkdir()
     assert approve(d, "nope") is False
+
+
+def test_edit_updates_content_bumps_version_and_audits(tmp_path):
+    d = tmp_path / "manuals"
+    d.mkdir()
+    _write(d, Manual(id="m", screen_id="S", action="save", branch_md="old", status="frozen", version=1))
+
+    m = edit(d, "m", branch_md="new 안내", by="kim")
+    assert m.branch_md == "new 안내"
+    assert m.version == 2  # 버전업
+    assert m.reviewed_by == "kim"
+    assert read(d, "m").branch_md == "new 안내"  # 디스크 반영
+
+    entries = [json.loads(x) for x in (tmp_path / "review_log.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert entries[-1]["action"] == "edit" and entries[-1]["by"] == "kim"
+
+
+def test_edit_missing_returns_none(tmp_path):
+    d = tmp_path / "manuals"
+    d.mkdir()
+    assert edit(d, "nope", branch_md="x") is None
