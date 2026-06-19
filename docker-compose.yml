@@ -8,3 +8,21 @@ services:
     volumes:
       - ./data/qdrant_storage:/qdrant/storage
     restart: always
+
+  mariadb:
+    image: mariadb:11.4
+    container_name: bnk-botx-mariadb
+    ports:
+      - "13307:3306"
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: bnk_botx
+      MARIADB_USER: bnk_botx_user
+      MARIADB_PASSWORD: bnk_botx_user
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - ./data/mariadb:/var/lib/mysql
+    restart: always
