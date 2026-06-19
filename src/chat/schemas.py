@@ -21,3 +21,4 @@ class QueryResponse(BaseModel):
     answer: str
     handoff: bool = False
     sources: list[Source] = []
+    related: list[Source] = []  # lineage 그래프로 연결된 관련 작업(같은 테이블/매퍼/화면)

@@ -3,8 +3,9 @@
 은행 업무 담당자가 **사내 프로그램을 쓰다 막힐 때**(오류·업무흐름·화면 표기 의미·다음 단계·화면 간 데이터 차이) 지금은 개발자에게 전화로 묻는 질문을, **챗봇이 1차로 받아 답하고 못 푸는 것만 개발자에게 넘기는** 엔진.
 근거는 새로 저작하지 않고 **이미 있는 자산(소스코드·SQL·스키마·표준용어)을 변환**해서 만든다.
 
-> **Status: 슬라이스(P0~P5) 통과 ✅** — 측정① pytest 8/8 · 측정③ eval_answer 5/5(exit 0). KURE 설치됨. 다음 = **P6 예시 앱 확대(규모·난이도)**.
-> 코드: `src/`(엔진 전체) · `examples/bank_sample/`(seed 3화면) · `scripts/`(eval_extract·build_manuals·load_manuals·eval_query·eval_answer) · `tests/`(8) · `data/manuals/` · `.venv/`.
+> **Status: 슬라이스(P0~P5) 통과 ✅ + 엔진 보강 중** — pytest 11/11 · eval_answer 5/5. **lineage 그래프 연결·관련작업 roll-up ✅**. KURE 설치됨.
+> 다음 = (샘플 무관) 핸드오프 축적 루프 · 검수 워크플로우 / (샘플 대기) **P6 파서 일반화**.
+> 코드: `src/`(엔진 전체 + 그래프) · `examples/bank_sample/`(seed 3화면) · `scripts/`(eval_extract·build_manuals·load_manuals·eval_query·eval_answer) · `tests/`(11) · `data/` · `.venv/`.
 > 실행: `docker compose up -d`(Qdrant 6335) → `uvicorn src.main:app --port 9000`.
 > 게이트: `pytest` + `python scripts/eval_answer.py`. 빌드·적재: `build_manuals.py` → `load_manuals.py`.
 > 형제 프로젝트: `../BNK_Bot`(원본, 약관/설명서 PDF RAG — 참고 대상) · `../BNK_Bot_S`(소스-aware 프로토타입 — 참고 대상).

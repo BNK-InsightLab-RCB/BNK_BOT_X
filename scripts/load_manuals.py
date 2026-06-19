@@ -9,6 +9,7 @@ import json
 
 from src.config import settings
 from src.ingestion.embedder import Embedder
+from src.ingestion.graph_store import GraphStore
 from src.ingestion.indexer import Indexer
 from src.ingestion.qdrant_store import QdrantStore
 from src.models import Manual
@@ -33,6 +34,10 @@ def main() -> None:
     embedder = Embedder(settings.embedding_model, dim=settings.embedding_dim)
     n = Indexer(store, embedder).index_manuals(manuals)
     print(f"loaded {len(manuals)} manuals → {n} points; collection count = {store.count()}")
+
+    graph = GraphStore(settings.graph_db_path)
+    graph.build_from_manuals(manuals)
+    print(f"lineage graph: {graph.count()} manuals")
 
     print("\n=== 적재 확인: retrieve('경비집행내역 저장이 안돼요', role=branch) ===")
     hits = store.search(embedder.embed_one("경비집행내역 저장이 안돼요"), top_k=3, role="branch")

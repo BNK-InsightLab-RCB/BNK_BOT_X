@@ -17,6 +17,7 @@ from src.chat.router import router as chat_router
 from src.chat.service import ChatService
 from src.config import settings
 from src.ingestion.embedder import Embedder
+from src.ingestion.graph_store import GraphStore
 from src.ingestion.qdrant_store import QdrantStore
 from src.ingestion.router import router as admin_router
 
@@ -45,11 +46,13 @@ async def lifespan(app: FastAPI):
     )
     retriever = Retriever(embedder, store)
     gate = PrecisionGate()
+    graph = GraphStore(settings.graph_db_path)
 
     app.state.embedder = embedder
     app.state.store = store
     app.state.generator = generator
-    app.state.chat_service = ChatService(retriever, gate, generator)
+    app.state.graph = graph
+    app.state.chat_service = ChatService(retriever, gate, generator, graph)
     yield
 
 

@@ -26,17 +26,18 @@ _SYS_IT = (
 
 
 class ChatService:
-    def __init__(self, retriever, gate, generator):
+    def __init__(self, retriever, gate, generator, graph=None):
         self.retriever = retriever
         self.gate = gate
         self.generator = generator
+        self.graph = graph  # lineage 그래프(질의시점 관련작업 확장)
 
     def answer(self, question: str, role: str = "branch", top_k: int = 5) -> QueryResponse:
         hits = self.retriever.retrieve(question, role=role, top_k=top_k)
         if not self.gate.passes(hits):
             return QueryResponse(answer=HANDOFF_MSG, handoff=True, sources=[])
-        body = hits[0]["payload"].get("body", "")
-        answer = self._compose(question, body, role)
+        top = hits[0]["payload"]
+        answer = self._compose(question, top.get("body", ""), role)
         sources = [
             Source(
                 manual_id=h["payload"]["manual_id"],
@@ -46,7 +47,13 @@ class ChatService:
             )
             for h in hits[:3]
         ]
-        return QueryResponse(answer=answer, handoff=False, sources=sources)
+        related = []
+        if self.graph is not None:
+            related = [
+                Source(manual_id=r["manual_id"], screen_ko=r["screen_ko"], action=r["action"])
+                for r in self.graph.related(top["manual_id"])
+            ]
+        return QueryResponse(answer=answer, handoff=False, sources=sources, related=related)
 
     def _compose(self, question: str, body: str, role: str) -> str:
         system = _SYS_BRANCH if role == "branch" else _SYS_IT
